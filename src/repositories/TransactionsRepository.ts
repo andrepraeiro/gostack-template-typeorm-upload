@@ -1,4 +1,4 @@
-import { EntityRepository, Repository } from 'typeorm';
+import { EntityRepository, Repository, getConnection } from 'typeorm';
 
 import Transaction from '../models/Transaction';
 
@@ -8,30 +8,32 @@ interface Balance {
   total: number;
 }
 
+interface TransactionSum {
+  type: string;
+  sum: number;
+}
+
 @EntityRepository(Transaction)
 class TransactionsRepository extends Repository<Transaction> {
   public async getBalance(): Promise<Balance> {
-    const balance = { income: 0, outcome: 0, total: 0 };
-    const transactions = await this.find();
-    balance.income = transactions.reduce(
-      (totalIncome = 0, currentTransaction) => {
-        return currentTransaction.type === 'income'
-          ? totalIncome + currentTransaction.value
-          : totalIncome;
-      },
-      0,
-    );
+    const transactionSums: TransactionSum[] = await getConnection()
+      .createQueryBuilder()
+      .select('t.type', 'type')
+      .addSelect('sum(t.value)', 'sum')
+      .from(Transaction, 't')
+      .groupBy('t.type')
+      .getRawMany();
 
-    balance.outcome = transactions.reduce(
-      (totalOutcome = 0, currentTransaction) => {
-        return currentTransaction.type === 'outcome'
-          ? totalOutcome + currentTransaction.value
-          : totalOutcome;
-      },
-      0,
-    );
+    const income =
+      transactionSums.find(item => item.type === 'income')?.sum || 0;
+    const outcome =
+      transactionSums.find(item => item.type === 'outcome')?.sum || 0;
+    const balance = {
+      income,
+      outcome,
+      total: income - outcome,
+    };
 
-    balance.total = balance.income - balance.outcome;
     return balance;
   }
 }

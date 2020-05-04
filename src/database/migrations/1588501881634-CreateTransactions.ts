@@ -21,7 +21,7 @@ export default class CreateTransactions1588501881634
           },
           { name: 'title', type: 'varchar' },
           { name: 'type', type: 'varchar' },
-          { name: 'value', type: 'numeric(18,2)' },
+          { name: 'value', type: 'real' },
           { name: 'category_id', type: 'uuid' },
           { name: 'created_at', type: 'timestamp', default: 'now()' },
           { name: 'updated_at', type: 'timestamp', default: 'now()' },
