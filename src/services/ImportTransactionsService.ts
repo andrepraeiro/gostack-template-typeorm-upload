@@ -5,33 +5,44 @@ import Transaction from '../models/Transaction';
 import uploadConfig from '../config/upload';
 import CreateTransactionService from './CreateTransactionService';
 
+interface Line {
+  title: string;
+  type: 'income' | 'outcome';
+  value: number;
+  category: string;
+}
+
 class ImportTransactionsService {
+  private readFile(filePath: string): Promise<Line[]> {
+    return new Promise((resolve, reject) => {
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      cvsParse(
+        fileContent,
+        { trim: true, columns: true },
+        (err, transactions: Line[]) => {
+          if (err) reject(err);
+          else resolve(transactions);
+        },
+      );
+    });
+  }
+
   async execute(file: Express.Multer.File): Promise<Transaction[]> {
-    console.log(file);
     const filePath = path.join(uploadConfig.directory, file.filename);
-    const transactions: Transaction[] = [];
-    const createTransaction = new CreateTransactionService();
-    fs.createReadStream(filePath)
-      .on('error', () => {})
-
-      .pipe(cvsParse())
-
-      .on('data', async row => {
-        const title = row[0].trim();
-        const type = row[1].trim();
-        const value = parseFloat(row[2].trim());
-        const category = row[3].trim();
-
+    const Lines = await this.readFile(filePath);
+    const transactions = Promise.all(
+      Lines.map(async ({ title, type, value, category }) => {
+        const createTransaction = new CreateTransactionService();
         const transaction = await createTransaction.execute({
           title,
           type,
           value,
           category_title: category,
         });
-
-        transactions.push(transaction);
-      })
-      .on('end', () => transactions);
+        return transaction;
+      }),
+    );
+    return transactions;
   }
 }
 
